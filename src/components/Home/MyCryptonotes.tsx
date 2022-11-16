@@ -19,8 +19,7 @@ const MyCryptonotes: FC<MyCryptonotesProps> = ({ isOpen, onClose }) => {
   const { address } = useAccount()
   const { chain } = useNetwork()
 
-  // @ts-ignore
-  const { data: { answer } } = useContractRead({
+  const { data: priceData } = useContractRead({
     address: '0xD4a33860578De61DBAbDc8BFdb98FD742fA7028e',
     abi: aggregatorV3InterfaceABI,
     functionName: 'latestRoundData',
@@ -53,10 +52,10 @@ const MyCryptonotes: FC<MyCryptonotesProps> = ({ isOpen, onClose }) => {
         fetching ? <CardLoadingSkeleton/> : (!data?.notes || data?.notes.length === 0) ? (
           <Box mt={8}>No data found</Box>
         ) : (
-          <SimpleGrid justifyContent={'center'} columns={{ sm: 2, md: 4 }} spacing={3} py={3}>
+          <SimpleGrid justifyContent={'center'} columns={{ base: 1, sm: 2, lg: 2, xl: 4 }} spacing={3} py={3} px={5}>
             {
               (data?.notes ?? [] as Note[]).map((note: Note) => (
-                <NoteBox key={note.id} ethInUsd={utils.formatUnits(answer, 8)} note={note} reexecuteQuery={reexecuteQuery} />
+                <NoteBox key={note.id} ethInUsd={utils.formatUnits((priceData as any)?.answer || '0', 8)} note={note} reexecuteQuery={reexecuteQuery} />
               ))
             }
           </SimpleGrid>

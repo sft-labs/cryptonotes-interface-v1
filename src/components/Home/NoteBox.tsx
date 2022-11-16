@@ -64,7 +64,7 @@ const NoteBox: FC<NoteBoxProps> = ({ note, ethInUsd, reexecuteQuery }) => {
   const debouncedRecipient = useDebounce(recipient, DEBOUNCE_PERIOD)
   const [amount, setAmount] = useState<number | undefined>()
   const debouncedAmount = useDebounce(amount, DEBOUNCE_PERIOD)
-  const [splitByTknId, setSplitByTknId] = useState<boolean>(true)
+  const [splitToAddress, setSplitToAddress] = useState<boolean>(true)
   const [action, setAction] = useState<string>()
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false)
 
@@ -86,8 +86,8 @@ const NoteBox: FC<NoteBoxProps> = ({ note, ethInUsd, reexecuteQuery }) => {
     setAmount(undefined)
     setIsSubmitting(false)
     setRecipient('')
-    setSplitByTknId(true)
-  }, [setAction, setAmount, setIsSubmitting, setRecipient, setSplitByTknId])
+    setSplitToAddress(true)
+  }, [setAction, setAmount, setIsSubmitting, setRecipient, setSplitToAddress])
 
   const onModalClose = useCallback(() => {
     onClose()
@@ -112,11 +112,6 @@ const NoteBox: FC<NoteBoxProps> = ({ note, ethInUsd, reexecuteQuery }) => {
           },
           {
             "internalType": "uint256",
-            "name": "newTokenId_",
-            "type": "uint256"
-          },
-          {
-            "internalType": "uint256",
             "name": "splitUnits_",
             "type": "uint256"
           }
@@ -129,11 +124,10 @@ const NoteBox: FC<NoteBoxProps> = ({ note, ethInUsd, reexecuteQuery }) => {
     ],
     functionName: 'split',
     args: [
-      BigNumber.from(note.tokenId ?? '0'),
-      BigNumber.from(debouncedTargetTokenId ?? '0'),
+      BigNumber.from(note.tokenId || '0'),
       utils.parseEther(debouncedAmount?.toString() || '0')
     ],
-    enabled: action === 'split' && !!note.tokenId && !!debouncedTargetTokenId && !!debouncedAmount,
+    enabled: action === 'split' && !!note.tokenId && !!debouncedAmount,
   })
 
   const {
@@ -243,8 +237,8 @@ const NoteBox: FC<NoteBoxProps> = ({ note, ethInUsd, reexecuteQuery }) => {
     ],
     functionName: 'merge',
     args: [
-      BigNumber.from(note.tokenId ?? '0'),
-      BigNumber.from(debouncedTargetTokenId ?? '0')
+      BigNumber.from(note.tokenId || '0'),
+      BigNumber.from(debouncedTargetTokenId || '0')
     ],
     enabled: action === 'merge' && !!debouncedTargetTokenId && !!note.tokenId,
   })
@@ -318,7 +312,7 @@ const NoteBox: FC<NoteBoxProps> = ({ note, ethInUsd, reexecuteQuery }) => {
     abi: [...CryptonotesAbi],
     functionName: 'withdraw',
     args: [note.tokenId],
-    enabled: action === 'withdraw' && !!note.tokenId,
+    enabled: !!note.tokenId,
   })
 
   const {
@@ -463,7 +457,7 @@ const NoteBox: FC<NoteBoxProps> = ({ note, ethInUsd, reexecuteQuery }) => {
     setLoadingText(<WithTxConfirmation />)
 
     if (action === 'split') {
-      if (!splitByTknId) {
+      if (splitToAddress) {
         splitByAddress?.()
       } else {
         split?.()
@@ -473,7 +467,7 @@ const NoteBox: FC<NoteBoxProps> = ({ note, ethInUsd, reexecuteQuery }) => {
     } else if (action === 'topup') {
       topUp?.()
     }
-  }, [action, splitByTknId, split, splitByAddress, merge, topUp, setIsOverlayLoading, setLoadingText])
+  }, [action, splitToAddress, split, splitByAddress, merge, topUp, setIsOverlayLoading, setLoadingText])
 
   const getImage = useCallback(() => {
     const uri = (tokenURI as string) || note.tokenURI
@@ -487,6 +481,18 @@ const NoteBox: FC<NoteBoxProps> = ({ note, ethInUsd, reexecuteQuery }) => {
       }
     }
   }, [tokenURI, note.tokenURI])
+
+  const isDisable = useCallback(() => {
+    if (action === 'merge') {
+      return !merge
+    } else if (action === 'split' && splitToAddress) {
+      return !splitByAddress
+    } else if (action === 'split' && !splitToAddress) {
+      return !split
+    } else if (action === 'topup') {
+      return !topUp
+    }
+  }, [action, splitToAddress, merge, split, splitByAddress, topUp])
 
   return (
     <>
@@ -535,7 +541,7 @@ const NoteBox: FC<NoteBoxProps> = ({ note, ethInUsd, reexecuteQuery }) => {
             <Tooltip label="Split this note" hasArrow bg={'gray.300'} color='black'>
               <Button
                 colorScheme={'cyan'}
-                disabled={isSubmitting || isSpliting || isSplitLoading}
+                disabled={isSubmitting || isSpliting || isSplitingByAddressLoading || isSplitLoading}
                 onClick={() => onActionClick('split')}
               >
                 <AiOutlineSplitCells size={25} />
@@ -554,16 +560,16 @@ const NoteBox: FC<NoteBoxProps> = ({ note, ethInUsd, reexecuteQuery }) => {
                 colorScheme={'cyan'}
                 disabled={isTopUpLoading || isTopup || isSubmitting}
                 onClick={() => onActionClick('topup')}
-              ><AiOutlineDownload size={25} /></Button>
+              ><AiOutlineUpload size={25} /></Button>
             </Tooltip>
             <Tooltip label="Withdraw funds from this note" hasArrow bg={'gray.300'} color='black'>
               <Button
                 colorScheme={'cyan'}
-                disabled={isSubmitting || isWithdrawLoading || isWithdrawal}
+                disabled={!withdraw || isSubmitting || isWithdrawLoading || isWithdrawal}
                 onClick={() => onActionClick('withdraw')}
                 isLoading={isWithdrawLoading || isWithdrawal}
                 loadingText={''}
-              ><AiOutlineUpload size={25} /></Button>
+              ><AiOutlineDownload size={25} /></Button>
             </Tooltip>
           </HStack>
         </Box>
@@ -585,15 +591,15 @@ const NoteBox: FC<NoteBoxProps> = ({ note, ethInUsd, reexecuteQuery }) => {
             action === 'split' && (
               <FormControl display='flex' alignItems='center' alignContent={'center'} mb={2}>
                 <FormLabel mb={0}>
-                  Split By TokenId?
+                  Split to Address?
                 </FormLabel>
-                <Switch id='split-by-tkn-id' isChecked={splitByTknId} onChange={(e: ChangeEvent<HTMLInputElement>) => setSplitByTknId(!splitByTknId)} />
+                <Switch id='split-by-tkn-id' isChecked={splitToAddress} onChange={(e: ChangeEvent<HTMLInputElement>) => setSplitToAddress(!splitToAddress)} />
               </FormControl>
             )
           }
 
           {
-            (action === 'split' && !splitByTknId) && (
+            (action === 'split' && splitToAddress) && (
               <FormControl>
                 <FormLabel>Recipient</FormLabel>
                 <Input
@@ -605,7 +611,7 @@ const NoteBox: FC<NoteBoxProps> = ({ note, ethInUsd, reexecuteQuery }) => {
           }
 
           {
-            (action === 'merge' || action === 'withdraw' || (action === 'split' && splitByTknId)) ? (
+            action === 'merge' && (
               <FormControl>
                 <FormLabel>Token ID</FormLabel>
                 <Input
@@ -614,7 +620,7 @@ const NoteBox: FC<NoteBoxProps> = ({ note, ethInUsd, reexecuteQuery }) => {
                   onChange={(e: ChangeEvent<HTMLInputElement>) => setTargetTokenId(e.target.value)}
                 />
               </FormControl>
-            ) : ''
+            )
           }
 
           {
@@ -663,20 +669,14 @@ const NoteBox: FC<NoteBoxProps> = ({ note, ethInUsd, reexecuteQuery }) => {
             onClick={onModalClose}
             disabled={
               isSubmitting || isSplitLoading || isSpliting || isMergeLoading || isMerging
-              || isTopUpLoading || isTopup || isWithdrawLoading || isWithdrawal
+              || isTopUpLoading || isTopup
             }
           >Cancel</Button>
           <Button
             colorScheme='cyan'
             onClick={onSubmit}
-            disabled={
-              isSubmitting || isSplitLoading || isSpliting || isSplitingByAddressLoading || isSplitByAddressTxLoading || isMergeLoading || isMerging
-              || isTopUpLoading || isTopup || isWithdrawLoading || isWithdrawal
-            }
-            isLoading={
-              isSubmitting || isSplitLoading || isSpliting || isSplitingByAddressLoading || isSplitByAddressTxLoading || isMergeLoading || isMerging
-              || isTopUpLoading || isTopup || isWithdrawLoading || isWithdrawal
-            }
+            disabled={isSubmitting || isDisable()}
+            isLoading={isSubmitting}
             loadingText={'Submitting'}
           >
             <Text casing={'capitalize'}>{action}</Text>
