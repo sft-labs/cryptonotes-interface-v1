@@ -22,8 +22,8 @@ const supportedChains = testnets // process.env.NODE_ENV === 'production' ? main
 const { chains, provider } = configureChains(
   supportedChains,
   [
+    // alchemyProvider({ apiKey: process.env.REACT_APP_ALCHEMY_ID || '' }),
     publicProvider(),
-    alchemyProvider({ apiKey: process.env.REACT_APP_ALCHEMY_ID || '' }),
   ]
 )
 

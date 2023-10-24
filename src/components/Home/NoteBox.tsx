@@ -1,4 +1,4 @@
-import { FC, useCallback, useState, useEffect, ChangeEvent } from 'react'
+import { FC, useCallback, useState, useEffect, ChangeEvent, useMemo } from 'react'
 import {
   Badge,
   Box,
@@ -27,7 +27,6 @@ import {
   NumberInput,
   NumberInputField,
   NumberInputStepper,
-  Switch,
   Tooltip
 } from '@chakra-ui/react'
 import { useAccount, useContractRead, useContractWrite, useNetwork, usePrepareContractWrite, useWaitForTransaction } from 'wagmi'
@@ -42,6 +41,7 @@ import WithTxInProgress from '../WithTxInProgress'
 import WithTxConfirmation from '../WithTxConfirmation'
 import Placeholder from '../../assets/images/placeholder.jpeg'
 import Note from '../../types/note'
+import { mergeAbi, splitByAddressAbi, splitByTokenIdAbi } from '../../utils/abis'
 const CryptonotesAbi = require('../../abis/Cryptonotes.json')
 
 interface NoteBoxProps {
@@ -64,15 +64,23 @@ const NoteBox: FC<NoteBoxProps> = ({ note, ethInUsd, reexecuteQuery }) => {
   const debouncedRecipient = useDebounce(recipient, DEBOUNCE_PERIOD)
   const [amount, setAmount] = useState<number | undefined>()
   const debouncedAmount = useDebounce(amount, DEBOUNCE_PERIOD)
-  const [splitToAddress, setSplitToAddress] = useState<boolean>(true)
+  const [splitToAddress, setSplitToAddress] = useState<boolean>(false)
   const [action, setAction] = useState<string>()
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false)
 
   const { setIsOverlayLoading, setLoadingText } = useLoading()
 
-  const toast = useToast()
-  const toastBgColor = useColorModeValue('white', 'red')
   const toastWarningBgColor = useColorModeValue('white', 'yellow.900')
+  const toast = useToast({
+    position: 'bottom-right',
+    variant: 'left-accent',
+    isClosable: true,
+    duration: 9000,
+    containerStyle: {
+      background: toastWarningBgColor,
+      borderRadius: '0.5rem',
+    }
+  })
 
   const { data: tokenURI } = useContractRead({
     address: contracts[`${chain?.id as number}`],
@@ -96,32 +104,9 @@ const NoteBox: FC<NoteBoxProps> = ({ note, ethInUsd, reexecuteQuery }) => {
   }, [onClose, resetValues, setIsOverlayLoading])
 
   /* ========== SPLIT ========== */
-  const {
-    config: splitConfig,
-    error: splitPrepareError,
-    isError: isSplitPrepareError,
-  } = usePrepareContractWrite({
+  const { config: splitConfig } = usePrepareContractWrite({
     address: contracts[`${chain?.id as number}`],
-    abi: [
-      {
-        "inputs": [
-          {
-            "internalType": "uint256",
-            "name": "fromTokenId_",
-            "type": "uint256"
-          },
-          {
-            "internalType": "uint256",
-            "name": "splitUnits_",
-            "type": "uint256"
-          }
-        ],
-        "name": "split",
-        "outputs": [],
-        "stateMutability": "nonpayable",
-        "type": "function"
-      }
-    ],
+    abi: splitByTokenIdAbi,
     functionName: 'split',
     args: [
       BigNumber.from(note.tokenId || '0'),
@@ -132,54 +117,49 @@ const NoteBox: FC<NoteBoxProps> = ({ note, ethInUsd, reexecuteQuery }) => {
 
   const {
     data: splitData,
-    error: splitError,
-    isError: isSplitError,
     write: split,
     isLoading: isSpliting
-  } = useContractWrite({ ...splitConfig })
+  } = useContractWrite({
+     ...splitConfig,
+     onError: (err: any) => {
+       toast({
+         title: `⚠️ Split Note Warning`,
+         description: `${extractErrorMessage(err)}`,
+         status: 'warning',
+       })
+       setIsOverlayLoading(false)
+       setIsSubmitting(false)
+     },
+  })
  
-  const {
-    isLoading: isSplitLoading,
-    isSuccess: isSplitSuccess,
-    isError: isSplitTxError,
-    error: splitTxError
-  } = useWaitForTransaction({
+  const { isLoading: isSplitTxLoading } = useWaitForTransaction({
     hash: splitData?.hash,
     confirmations: 2,
-    onSettled: () => setIsOverlayLoading(false)
+    onSettled: () => {
+      setIsOverlayLoading(false)
+      setIsSubmitting(false)
+    },
+    onSuccess: () => {
+      toast({
+        title: `🎉 Split Note Success`,
+        description: `Your transaction get mined successfully`,
+        status: 'success',
+      })
+      onModalClose()
+      reexecuteQuery({ requestPolicy: 'network-only' })
+    },
+    onError: (err: any) => {
+      toast({
+        title: `😱 Split Note Error`,
+        description: `${extractErrorMessage(err)}`,
+        status: 'error',
+      })
+    }
   })
 
-  const {
-    config: splitByAddressConfig,
-    error: splitByAddressPrepareError,
-    isError: isSplitByAddressPrepareError,
-  } = usePrepareContractWrite({
+  const { config: splitByAddressConfig } = usePrepareContractWrite({
     address: contracts[`${chain?.id as number}`],
-    abi: [
-      {
-        "inputs": [
-          {
-            "internalType": "uint256",
-            "name": "fromTokenId_",
-            "type": "uint256"
-          },
-          {
-            "internalType": "address",
-            "name": "to_",
-            "type": "address"
-          },
-          {
-            "internalType": "uint256",
-            "name": "splitUnits_",
-            "type": "uint256"
-          }
-        ],
-        "name": "split",
-        "outputs": [],
-        "stateMutability": "nonpayable",
-        "type": "function"
-      }
-    ],
+    abi: splitByAddressAbi,
     functionName: 'split',
     args: [
       BigNumber.from(note.tokenId ?? '0'),
@@ -191,50 +171,50 @@ const NoteBox: FC<NoteBoxProps> = ({ note, ethInUsd, reexecuteQuery }) => {
 
   const {
     data: splitByAddressData,
-    error: splitByAddressError,
-    isError: isSplitByAddressError,
     write: splitByAddress,
-    isLoading: isSplitingByAddressLoading
-  } = useContractWrite({ ...splitByAddressConfig })
+    isLoading: isSplitingByAddress
+  } = useContractWrite({
+    ...splitByAddressConfig,
+    onError: (err: any) => {
+      toast({
+        title: `⚠️ Split Note Warning`,
+        description: `${extractErrorMessage(err)}`,
+        status: 'warning',
+      })
+      setIsOverlayLoading(false)
+      setIsSubmitting(false)
+    },
+  })
  
-  const {
-    isLoading: isSplitByAddressTxLoading,
-    isSuccess: isSplitByAddressTxSuccess,
-    isError: isSplitByAddressTxError,
-    error: splitByAddressTxError
-  } = useWaitForTransaction({
+  const { isLoading: isSplitByAddressTxLoading } = useWaitForTransaction({
     hash: splitByAddressData?.hash,
     confirmations: 2,
-    onSettled: () => setIsOverlayLoading(false)
+    onSettled: () => {
+      setIsOverlayLoading(false)
+      setIsSubmitting(false)
+    },
+    onSuccess: () => {
+      toast({
+        title: `🎉 Split Note Success`,
+        description: `Your transaction get mined successfully`,
+        status: 'success',
+      })
+      onModalClose()
+      reexecuteQuery({ requestPolicy: 'network-only' })
+    },
+    onError: (err: any) => {
+      toast({
+        title: `😱 Split Note Error`,
+        description: `${extractErrorMessage(err)}`,
+        status: 'error',
+      })
+    }
   })
 
   /* ========== MERGE ========== */
-  const {
-    config: mergeConfig,
-    error: mergePrepareError,
-    isError: isMergePrepareError,
-  } = usePrepareContractWrite({
+  const { config: mergeConfig } = usePrepareContractWrite({
     address: contracts[`${chain?.id as number}`],
-    abi: [
-      {
-        "inputs": [
-          {
-            "internalType": "uint256",
-            "name": "tokenId_",
-            "type": "uint256"
-          },
-          {
-            "internalType": "uint256",
-            "name": "targetTokenId_",
-            "type": "uint256"
-          }
-        ],
-        "name": "merge",
-        "outputs": [],
-        "stateMutability": "nonpayable",
-        "type": "function"
-      }
-    ],
+    abi: mergeAbi,
     functionName: 'merge',
     args: [
       BigNumber.from(note.tokenId || '0'),
@@ -245,29 +225,48 @@ const NoteBox: FC<NoteBoxProps> = ({ note, ethInUsd, reexecuteQuery }) => {
 
   const {
     data: mergeData,
-    error: mergeError,
-    isError: isMergeError,
     write: merge,
     isLoading: isMerging
-  } = useContractWrite({ ...mergeConfig })
+  } = useContractWrite({
+    ...mergeConfig,
+    onError: (err: any) => {
+      toast({
+        title: `⚠️ Merge Note Warning`,
+        description: `${extractErrorMessage(err)}`,
+        status: 'warning',
+      })
+      setIsOverlayLoading(false)
+      setIsSubmitting(false)
+    },
+  })
  
-  const {
-    isLoading: isMergeLoading,
-    isSuccess: isMergeSuccess,
-    isError: isMergeTxError,
-    error: mergeTxError
-  } = useWaitForTransaction({
+  const { isLoading: isMergeTxLoading } = useWaitForTransaction({
     hash: mergeData?.hash,
     confirmations: 2,
-    onSettled: () => setIsOverlayLoading(false)
+    onSettled: () => {
+      setIsOverlayLoading(false)
+      setIsSubmitting(false)
+    },
+    onSuccess: () => {
+      toast({
+        title: `🎉 Merge Note Success`,
+        description: `Your transaction get mined successfully`,
+        status: 'success',
+      })
+      onModalClose()
+      reexecuteQuery({ requestPolicy: 'network-only' })
+    },
+    onError: (err: any) => {
+      toast({
+        title: `😱 Merge Note Error`,
+        description: `${extractErrorMessage(err)}`,
+        status: 'error',
+      })
+    }
   })
 
   /* ========== TOPUP ========== */
-  const {
-    config: topUpConfig,
-    error: topUpPrepareError,
-    isError: isTopUpPrepareError,
-  } = usePrepareContractWrite({
+  const { config: topUpConfig } = usePrepareContractWrite({
     address: contracts[`${chain?.id as number}`],
     abi: [...CryptonotesAbi],
     functionName: 'topUp',
@@ -285,159 +284,103 @@ const NoteBox: FC<NoteBoxProps> = ({ note, ethInUsd, reexecuteQuery }) => {
 
   const {
     data: topUpData,
-    error: topUpError,
-    isError: isTopUpError,
     write: topUp,
     isLoading: isTopup
-  } = useContractWrite({ ...topUpConfig })
+  } = useContractWrite({ 
+    ...topUpConfig,
+    onError: (err: any) => {
+      toast({
+        title: `⚠️ Topup Note Warning`,
+        description: `${extractErrorMessage(err)}`,
+        status: 'warning',
+      })
+      setIsOverlayLoading(false)
+      setIsSubmitting(false)
+    },
+  })
  
   const {
     isLoading: isTopUpLoading,
-    isSuccess: isTopUpSuccess,
-    isError: isTopUpTxError,
-    error: topUpTxError
   } = useWaitForTransaction({
     hash: topUpData?.hash,
     confirmations: 2,
-    onSettled: () => setIsOverlayLoading(false),
+    onSettled: () => {
+      setIsOverlayLoading(false)
+      setIsSubmitting(false)
+    },
+    onSuccess: () => {
+      toast({
+        title: `🎉 Topup Note Success`,
+        description: `Your transaction get mined successfully`,
+        status: 'success',
+      })
+      onModalClose()
+      reexecuteQuery({ requestPolicy: 'network-only' })
+    },
+    onError: (err: any) => {
+      toast({
+        title: `😱 Topup Note Error`,
+        description: `${extractErrorMessage(err)}`,
+        status: 'error',
+      })
+    }
   })
 
   /* ========== WITHDRAW ========== */
-  const {
-    config: withdrawConfig,
-    error: withdrawPrepareError,
-    isError: isWithdrawPrepareError,
-  } = usePrepareContractWrite({
-    address: contracts[`${chain?.id as number}`],
+  const { config: withdrawConfig } = usePrepareContractWrite({
+    address: contracts[`${chain?.id || 5}`],
     abi: [...CryptonotesAbi],
     functionName: 'withdraw',
     args: [note.tokenId],
     enabled: !!note.tokenId,
   })
 
-  const {
-    data: withdrawData,
-    error: withdrawError,
-    isError: isWithdrawError,
-    write: withdraw,
-    isLoading: isWithdrawal
-  } = useContractWrite({
+  const { data: withdrawData, write: withdraw } = useContractWrite({
     ...withdrawConfig,
     request: withdrawConfig.request,
+    onError: (err: any) => {
+      toast({
+        title: `⚠️ Withdraw Note Warning`,
+        description: `${extractErrorMessage(err)}`,
+        status: 'warning',
+      })
+      setIsOverlayLoading(false)
+      setIsSubmitting(false)
+    },
   })
  
-  const {
-    isLoading: isWithdrawLoading,
-    isSuccess: isWithdrawSuccess,
-    isError: isWithdrawTxError,
-    error: withdrawTxError
-  } = useWaitForTransaction({
+  const { isLoading: isWithdrawLoading } = useWaitForTransaction({
     hash: withdrawData?.hash,
     confirmations: 2,
     onSettled: () => onWithdrawSettled(),
+    onSuccess: () => {
+      toast({
+        title: `🎉 Withdraw Note Success`,
+        description: `Your transaction get mined successfully`,
+        status: 'success',
+      })
+      onModalClose()
+      reexecuteQuery({ requestPolicy: 'network-only' })
+    },
+    onError: (err: any) => {
+      toast({
+        title: `😱 Withdraw Note Error`,
+        description: `${extractErrorMessage(err)}`,
+        status: 'error',
+      })
+    }
   })
 
   const onWithdrawSettled = () => {
     resetValues()
     setIsOverlayLoading(false)
+    setIsSubmitting(false)
   }
 
   /* ========== TX RESPONSE HANDLERS ========== */
   useEffect(() => {
     setLoadingText(<WithTxInProgress txHash={splitData?.hash || splitByAddressData?.hash || mergeData?.hash || topUpData?.hash || withdrawData?.hash} chainId={chain?.id} />)
-  }, [
-    setLoadingText, isSplitLoading, isSplitByAddressTxLoading, isMergeLoading, isTopUpLoading, isWithdrawLoading,
-    chain?.id, splitData?.hash, splitByAddressData?.hash, mergeData?.hash, topUpData?.hash, withdrawData?.hash
-  ])
-
-  const getTitle = useCallback((isSplit: boolean, isMerge: boolean, isTopup: boolean, isWithdraw: boolean) => {
-    return isSplit ? 'Split' : isMerge ? 'Merge' : isTopup ? 'Topup' : isWithdraw ? 'Withdraw' : ''
-  }, [])
-
-  useEffect(() => {
-    if (isSplitPrepareError || isSplitByAddressPrepareError || isMergePrepareError || isTopUpPrepareError || isWithdrawPrepareError) {
-      toast({
-        title: `⚠️ ${getTitle(isSplitPrepareError || isSplitByAddressPrepareError, isMergePrepareError, isTopUpPrepareError, isWithdrawPrepareError)} Note Warning`,
-        position: 'bottom-right',
-        variant: 'left-accent',
-        description: `${extractErrorMessage((splitPrepareError || splitByAddressPrepareError || mergePrepareError || topUpPrepareError || withdrawPrepareError))}`,
-        status: 'warning',
-        duration: 9000,
-        isClosable: true,
-        containerStyle: {
-          background: toastWarningBgColor,
-          borderRadius: '0.5rem',
-        }
-      })
-    }
-  }, [
-    splitPrepareError, isSplitPrepareError, splitByAddressPrepareError, isSplitByAddressPrepareError,
-    mergePrepareError, isMergePrepareError, topUpPrepareError, isTopUpPrepareError,
-    withdrawPrepareError, isWithdrawPrepareError, getTitle, setIsOverlayLoading,
-    toast, toastWarningBgColor, action, targetTokenId, amount
-  ])
-
-  useEffect(() => {
-    if (isSplitSuccess || isMergeSuccess || isSplitByAddressTxSuccess || isTopUpSuccess || isWithdrawSuccess) {
-      toast({
-        title: `🎉 ${getTitle(isSplitSuccess || isSplitByAddressTxSuccess, isMergeSuccess, isTopUpSuccess, isWithdrawSuccess)} Note Success`,
-        position: 'bottom-right',
-        variant: 'left-accent',
-        description: `Your transaction get mined successfully`,
-        status: 'success',
-        duration: 9000,
-        isClosable: true,
-      })
-      onModalClose()
-      reexecuteQuery({ requestPolicy: 'network-only' })
-    }
-  }, [isSplitSuccess, isSplitByAddressTxSuccess, isMergeSuccess, isTopUpSuccess, isWithdrawSuccess, toast, getTitle, onModalClose, reexecuteQuery])
-
-  useEffect(() => {
-    if (isSplitError || isSplitTxError || isSplitByAddressError || isSplitByAddressTxError || isMergeError || isMergeTxError
-       || isTopUpError || isTopUpTxError || isWithdrawError || isWithdrawTxError) {
-      toast({
-        title: `😱 ${getTitle(isSplitError || isSplitTxError || isSplitByAddressError || isSplitByAddressTxError, isMergeError || isMergeTxError, isTopUpError || isTopUpTxError, isWithdrawError || isWithdrawTxError)} Note Error`,
-        position: 'bottom-right',
-        variant: 'left-accent',
-        description: `${extractErrorMessage(splitError || splitTxError || splitByAddressError || splitByAddressTxError || mergeError || mergeTxError || topUpError || topUpTxError || withdrawError || withdrawTxError)}`,
-        status: 'error',
-        duration: 9000,
-        isClosable: true,
-        containerStyle: {
-          background: toastBgColor,
-          borderRadius: '0.5rem',
-        }
-      })
-      setIsOverlayLoading(false)
-      setIsSubmitting(false)
-    }
-  }, [
-    splitError,
-    isSplitError,
-    splitTxError,
-    isSplitTxError,
-    splitByAddressError,
-    isSplitByAddressError,
-    splitByAddressTxError,
-    isSplitByAddressTxError,
-    mergeError,
-    isMergeError,
-    mergeTxError,
-    isMergeTxError,
-    topUpError,
-    isTopUpError,
-    topUpTxError,
-    isTopUpTxError,
-    withdrawError,
-    isWithdrawError,
-    withdrawTxError,
-    isWithdrawTxError,
-    toast,
-    toastBgColor,
-    getTitle,
-    setIsOverlayLoading,
-  ])
+  }, [ setLoadingText, chain?.id, splitData?.hash, splitByAddressData?.hash, mergeData?.hash, topUpData?.hash, withdrawData?.hash ])
 
   const onActionClick = useCallback((action: string) => {
     setAction(() => action)
@@ -482,7 +425,7 @@ const NoteBox: FC<NoteBoxProps> = ({ note, ethInUsd, reexecuteQuery }) => {
     }
   }, [tokenURI, note.tokenURI])
 
-  const isDisable = useCallback(() => {
+  const isDisable = useMemo(() => {
     if (action === 'merge') {
       return !merge
     } else if (action === 'split' && splitToAddress) {
@@ -541,7 +484,7 @@ const NoteBox: FC<NoteBoxProps> = ({ note, ethInUsd, reexecuteQuery }) => {
             <Tooltip label="Split this note" hasArrow bg={'gray.300'} color='black'>
               <Button
                 colorScheme={'cyan'}
-                disabled={isSubmitting || isSpliting || isSplitingByAddressLoading || isSplitLoading}
+                disabled={isSubmitting || isSpliting || isSplitingByAddress || isSplitTxLoading || isSplitByAddressTxLoading}
                 onClick={() => onActionClick('split')}
               >
                 <AiOutlineSplitCells size={25} />
@@ -552,7 +495,7 @@ const NoteBox: FC<NoteBoxProps> = ({ note, ethInUsd, reexecuteQuery }) => {
               <Button
                 colorScheme={'cyan'}
                 onClick={() => onActionClick('merge')}
-                disabled={isMergeLoading || isMerging || isSubmitting}
+                disabled={isMergeTxLoading || isMerging || isSubmitting}
               ><AiOutlineMergeCells size={25} /></Button>
             </Tooltip>
             <Tooltip label="Top up more funds to this note" hasArrow bg={'gray.300'} color='black'>
@@ -565,9 +508,9 @@ const NoteBox: FC<NoteBoxProps> = ({ note, ethInUsd, reexecuteQuery }) => {
             <Tooltip label="Withdraw funds from this note" hasArrow bg={'gray.300'} color='black'>
               <Button
                 colorScheme={'cyan'}
-                disabled={!withdraw || isSubmitting || isWithdrawLoading || isWithdrawal}
+                disabled={!withdraw || isSubmitting || isWithdrawLoading}
                 onClick={() => onActionClick('withdraw')}
-                isLoading={isWithdrawLoading || isWithdrawal}
+                isLoading={isWithdrawLoading}
                 loadingText={''}
               ><AiOutlineDownload size={25} /></Button>
             </Tooltip>
@@ -587,7 +530,7 @@ const NoteBox: FC<NoteBoxProps> = ({ note, ethInUsd, reexecuteQuery }) => {
         </ModalHeader>
         <ModalCloseButton />
         <ModalBody pb={6}>
-          {
+          {/* {
             action === 'split' && (
               <FormControl display='flex' alignItems='center' alignContent={'center'} mb={2}>
                 <FormLabel mb={0}>
@@ -596,7 +539,7 @@ const NoteBox: FC<NoteBoxProps> = ({ note, ethInUsd, reexecuteQuery }) => {
                 <Switch id='split-by-tkn-id' isChecked={splitToAddress} onChange={(e: ChangeEvent<HTMLInputElement>) => setSplitToAddress(!splitToAddress)} />
               </FormControl>
             )
-          }
+          } */}
 
           {
             (action === 'split' && splitToAddress) && (
@@ -668,14 +611,14 @@ const NoteBox: FC<NoteBoxProps> = ({ note, ethInUsd, reexecuteQuery }) => {
             mr={3}
             onClick={onModalClose}
             disabled={
-              isSubmitting || isSplitLoading || isSpliting || isMergeLoading || isMerging
-              || isTopUpLoading || isTopup
+              isSplitTxLoading || isSpliting || isSplitingByAddress || isSplitByAddressTxLoading
+                || isSubmitting || isMergeTxLoading || isMerging || isTopUpLoading || isTopup
             }
           >Cancel</Button>
           <Button
             colorScheme='cyan'
             onClick={onSubmit}
-            disabled={isSubmitting || isDisable()}
+            disabled={isSubmitting || isDisable}
             isLoading={isSubmitting}
             loadingText={'Submitting'}
           >
