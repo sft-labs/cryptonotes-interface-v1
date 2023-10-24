@@ -9,11 +9,6 @@ export const splitByTokenIdAbi: readonly any[] = [
       },
       {
         "internalType": "uint256",
-        "name": "newTokenId_",
-        "type": "uint256"
-      },
-      {
-        "internalType": "uint256",
         "name": "splitUnits_",
         "type": "uint256"
       }

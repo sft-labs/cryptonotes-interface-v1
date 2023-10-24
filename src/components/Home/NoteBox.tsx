@@ -94,7 +94,7 @@ const NoteBox: FC<NoteBoxProps> = ({ note, ethInUsd, reexecuteQuery }) => {
     setAmount(undefined)
     setIsSubmitting(false)
     setRecipient('')
-    setSplitToAddress(true)
+    setSplitToAddress(false)
   }, [setAction, setAmount, setIsSubmitting, setRecipient, setSplitToAddress])
 
   const onModalClose = useCallback(() => {
