@@ -1,10 +1,11 @@
 import { ColorModeScript } from '@chakra-ui/react'
 import * as React from 'react'
 import * as ReactDOM from 'react-dom/client'
-import { WagmiConfig, createClient, chain, configureChains } from 'wagmi'
+import { WagmiConfig, createClient, chain, configureChains, publicRpcUrls } from 'wagmi'
 import { alchemyProvider } from 'wagmi/providers/alchemy'
 import { ConnectKitProvider, getDefaultClient } from 'connectkit'
 import { jsonRpcProvider } from 'wagmi/providers/jsonRpc'
+import { publicProvider } from 'wagmi/providers/public'
 import { Provider as GraphProvider } from 'urql'
 import { App } from './App'
 import reportWebVitals from './reportWebVitals'
@@ -26,6 +27,7 @@ const { chains, provider } = configureChains(
     jsonRpcProvider({
       rpc: chain => ({ http: `https://eth-sepolia.g.alchemy.com/v2/${process.env.REACT_APP_ALCHEMY_ID}` })
     }),
+    publicProvider()
   ]
 )
 
