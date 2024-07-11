@@ -1,0 +1,16 @@
+{
+  "files": {
+    "main.js": "./static/js/main.1f16a3c9.js",
+    "static/js/563.00c922b0.chunk.js": "./static/js/563.00c922b0.chunk.js",
+    "static/js/942.0725061c.chunk.js": "./static/js/942.0725061c.chunk.js",
+    "static/js/522.f696e2aa.chunk.js": "./static/js/522.f696e2aa.chunk.js",
+    "static/js/836.1e810e37.chunk.js": "./static/js/836.1e810e37.chunk.js",
+    "static/js/299.93f009b5.chunk.js": "./static/js/299.93f009b5.chunk.js",
+    "static/media/placeholder.jpeg": "./static/media/placeholder.81191ed359a096d000d6.jpeg",
+    "static/media/eth-logo.svg": "./static/media/eth-logo.08a6a27840aa1bbf7988e5143d0cfd59.svg",
+    "index.html": "./index.html"
+  },
+  "entrypoints": [
+    "static/js/main.1f16a3c9.js"
+  ]
+}
