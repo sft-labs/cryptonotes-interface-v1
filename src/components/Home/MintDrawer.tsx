@@ -73,15 +73,15 @@ const MintDrawer: FC<MintDrawerProps> = ({ onClose, isOpen, reexecuteQuery }) =>
     return !!address && !!debouncedNoteName && !!debouncedDescription && !!debouncedAmount
   }
  
-  const resetValues = useCallback(() => {
+  const resetValues = () => {
     setNoteName('')
     setAmount(undefined)
     setDescription('')
     setIsOverlayLoading(false)
-  }, [setIsOverlayLoading])
+  }
 
   const { config } = usePrepareContractWrite({
-    address: contracts[`${chain?.id as number}`],
+    address: contracts[`${chain?.id as number}`].notes,
     abi: mintAbi,
     functionName: 'mint',
     args: [
@@ -105,7 +105,7 @@ const MintDrawer: FC<MintDrawerProps> = ({ onClose, isOpen, reexecuteQuery }) =>
     ...config,
     onSettled: (d, err) => {
       if (d?.hash) {
-        setLoadingText(<WithTxInProgress txHash={d?.hash} chainId={chain?.id} />)
+        setLoadingText(<WithTxInProgress txHash={d?.hash} chain={chain} />)
       } else {
         toast({
           title: `⚠️ Mint Note Warning`,
@@ -118,7 +118,7 @@ const MintDrawer: FC<MintDrawerProps> = ({ onClose, isOpen, reexecuteQuery }) =>
 
   const { isLoading } = useWaitForTransaction({
     hash: data?.hash,
-    confirmations: 2,
+    // confirmations: 2,
     onSuccess: () => {
       toast({
         title: '🎉 Mint Note',
@@ -163,7 +163,7 @@ const MintDrawer: FC<MintDrawerProps> = ({ onClose, isOpen, reexecuteQuery }) =>
           <DrawerBody>
             <Stack spacing='24px'>
               <Box>
-                <FormLabel htmlFor='noteName'>Note Name</FormLabel>
+                <FormLabel htmlFor='noteName'>Note Name <span style={{color: 'red'}}>*</span></FormLabel>
                 <Input
                   ref={focusField}
                   id='noteName'
@@ -175,7 +175,7 @@ const MintDrawer: FC<MintDrawerProps> = ({ onClose, isOpen, reexecuteQuery }) =>
               </Box>
 
               <Box>
-                <FormLabel htmlFor='amount'>Deposit Amount</FormLabel>
+                <FormLabel htmlFor='amount'>Deposit Amount <span style={{color: 'red'}}>*</span></FormLabel>
                 <InputGroup>
                   <InputLeftAddon py={2}>
                     <ETHLogo height={25} />
@@ -215,12 +215,12 @@ const MintDrawer: FC<MintDrawerProps> = ({ onClose, isOpen, reexecuteQuery }) =>
               </Box> */}
 
               <Box>
-                <FormLabel htmlFor='desc'>Description</FormLabel>
+                <FormLabel htmlFor='desc'>Description <span style={{color: 'red'}}>*</span></FormLabel>
                 <Textarea
                   id='desc'
                   value={description}
                   readOnly={isWriting}
-                  onChange={(e: ChangeEvent<HTMLTextAreaElement>) => setDescription(e.target.value)}
+                  onChange={(e: ChangeEvent<HTMLTextAreaElement>) => setDescription(e.target.value?.trim())}
                 />
               </Box>
             </Stack>

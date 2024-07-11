@@ -33,5 +33,5 @@ export const makeGraphClient = (): Client => {
 }
 
 export const getSubgraphUrl = (): string => {
-  return `${SUBGRAPH_HOSTED_URL}/notes-graph`
+  return `${SUBGRAPH_HOSTED_URL}`
 }

@@ -1,5 +1,7 @@
 # ETH Commemorative Cryptonotes Interface
 
+This project shows you how to use the capabilities provided by ERC3525, e.g. Split, Merge, Topup, and Transfer etc.
+
 ## Available Scripts
 
 In the project directory, you can run:

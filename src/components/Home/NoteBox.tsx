@@ -83,7 +83,7 @@ const NoteBox: FC<NoteBoxProps> = ({ note, ethInUsd, reexecuteQuery }) => {
   })
 
   const { data: tokenURI } = useContractRead({
-    address: contracts[`${chain?.id as number}`],
+    address: contracts[`${chain?.id as number}`].notes,
     abi: CryptonotesAbi,
     functionName: 'tokenURI',
     args: [note.tokenId],
@@ -105,7 +105,7 @@ const NoteBox: FC<NoteBoxProps> = ({ note, ethInUsd, reexecuteQuery }) => {
 
   /* ========== SPLIT ========== */
   const { config: splitConfig } = usePrepareContractWrite({
-    address: contracts[`${chain?.id as number}`],
+    address: contracts[`${chain?.id as number}`].notes,
     abi: splitByTokenIdAbi,
     functionName: 'split',
     args: [
@@ -134,7 +134,7 @@ const NoteBox: FC<NoteBoxProps> = ({ note, ethInUsd, reexecuteQuery }) => {
  
   const { isLoading: isSplitTxLoading } = useWaitForTransaction({
     hash: splitData?.hash,
-    confirmations: 2,
+    // confirmations: 2,
     onSettled: () => {
       setIsOverlayLoading(false)
       setIsSubmitting(false)
@@ -158,7 +158,7 @@ const NoteBox: FC<NoteBoxProps> = ({ note, ethInUsd, reexecuteQuery }) => {
   })
 
   const { config: splitByAddressConfig } = usePrepareContractWrite({
-    address: contracts[`${chain?.id as number}`],
+    address: contracts[`${chain?.id as number}`].notes,
     abi: splitByAddressAbi,
     functionName: 'split',
     args: [
@@ -188,7 +188,7 @@ const NoteBox: FC<NoteBoxProps> = ({ note, ethInUsd, reexecuteQuery }) => {
  
   const { isLoading: isSplitByAddressTxLoading } = useWaitForTransaction({
     hash: splitByAddressData?.hash,
-    confirmations: 2,
+    // confirmations: 2,
     onSettled: () => {
       setIsOverlayLoading(false)
       setIsSubmitting(false)
@@ -213,7 +213,7 @@ const NoteBox: FC<NoteBoxProps> = ({ note, ethInUsd, reexecuteQuery }) => {
 
   /* ========== MERGE ========== */
   const { config: mergeConfig } = usePrepareContractWrite({
-    address: contracts[`${chain?.id as number}`],
+    address: contracts[`${chain?.id as number}`].notes,
     abi: mergeAbi,
     functionName: 'merge',
     args: [
@@ -242,7 +242,7 @@ const NoteBox: FC<NoteBoxProps> = ({ note, ethInUsd, reexecuteQuery }) => {
  
   const { isLoading: isMergeTxLoading } = useWaitForTransaction({
     hash: mergeData?.hash,
-    confirmations: 2,
+    // confirmations: 2,
     onSettled: () => {
       setIsOverlayLoading(false)
       setIsSubmitting(false)
@@ -267,7 +267,7 @@ const NoteBox: FC<NoteBoxProps> = ({ note, ethInUsd, reexecuteQuery }) => {
 
   /* ========== TOPUP ========== */
   const { config: topUpConfig } = usePrepareContractWrite({
-    address: contracts[`${chain?.id as number}`],
+    address: contracts[`${chain?.id as number}`].notes,
     abi: [...CryptonotesAbi],
     functionName: 'topUp',
     args: [
@@ -303,7 +303,7 @@ const NoteBox: FC<NoteBoxProps> = ({ note, ethInUsd, reexecuteQuery }) => {
     isLoading: isTopUpLoading,
   } = useWaitForTransaction({
     hash: topUpData?.hash,
-    confirmations: 2,
+    // confirmations: 2,
     onSettled: () => {
       setIsOverlayLoading(false)
       setIsSubmitting(false)
@@ -328,7 +328,7 @@ const NoteBox: FC<NoteBoxProps> = ({ note, ethInUsd, reexecuteQuery }) => {
 
   /* ========== WITHDRAW ========== */
   const { config: withdrawConfig } = usePrepareContractWrite({
-    address: contracts[`${chain?.id || 5}`],
+    address: contracts[`${chain?.id || 11155111}`].notes,
     abi: [...CryptonotesAbi],
     functionName: 'withdraw',
     args: [note.tokenId],
@@ -340,7 +340,7 @@ const NoteBox: FC<NoteBoxProps> = ({ note, ethInUsd, reexecuteQuery }) => {
     request: withdrawConfig.request,
     onError: (err: any) => {
       toast({
-        title: `⚠️ Withdraw Note Warning`,
+        title: `⚠️ Note Withdrawal Warning`,
         description: `${extractErrorMessage(err)}`,
         status: 'warning',
       })
@@ -351,24 +351,26 @@ const NoteBox: FC<NoteBoxProps> = ({ note, ethInUsd, reexecuteQuery }) => {
  
   const { isLoading: isWithdrawLoading } = useWaitForTransaction({
     hash: withdrawData?.hash,
-    confirmations: 2,
-    onSettled: () => onWithdrawSettled(),
+    // confirmations: 2,
+    onSettled: (d, err) => {
+      if (err) {
+        toast({
+          title: `😱 Note Withdrawal Error`,
+          description: `${extractErrorMessage(err)}`,
+          status: 'error',
+        })
+      }
+      onWithdrawSettled()
+    },
     onSuccess: () => {
       toast({
-        title: `🎉 Withdraw Note Success`,
+        title: `🎉 Note Withdrawal Success`,
         description: `Your transaction get mined successfully`,
         status: 'success',
       })
       onModalClose()
       reexecuteQuery({ requestPolicy: 'network-only' })
     },
-    onError: (err: any) => {
-      toast({
-        title: `😱 Withdraw Note Error`,
-        description: `${extractErrorMessage(err)}`,
-        status: 'error',
-      })
-    }
   })
 
   const onWithdrawSettled = () => {
@@ -379,8 +381,8 @@ const NoteBox: FC<NoteBoxProps> = ({ note, ethInUsd, reexecuteQuery }) => {
 
   /* ========== TX RESPONSE HANDLERS ========== */
   useEffect(() => {
-    setLoadingText(<WithTxInProgress txHash={splitData?.hash || splitByAddressData?.hash || mergeData?.hash || topUpData?.hash || withdrawData?.hash} chainId={chain?.id} />)
-  }, [ setLoadingText, chain?.id, splitData?.hash, splitByAddressData?.hash, mergeData?.hash, topUpData?.hash, withdrawData?.hash ])
+    setLoadingText(<WithTxInProgress txHash={splitData?.hash || splitByAddressData?.hash || mergeData?.hash || topUpData?.hash || withdrawData?.hash} chain={chain} />)
+  }, [ setLoadingText, chain, splitData?.hash, splitByAddressData?.hash, mergeData?.hash, topUpData?.hash, withdrawData?.hash ])
 
   const onActionClick = useCallback((action: string) => {
     setAction(() => action)

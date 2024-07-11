@@ -9,6 +9,7 @@ import { getSubgraphUrl, queryNotesByAddress } from '../../utils/subgraphQuery'
 import { CardLoadingSkeleton } from '../CardLoadingSkeleton'
 import MintDrawer from './MintDrawer'
 import NoteBox from './NoteBox'
+import { contracts } from '../../utils/contracts'
 
 interface MyCryptonotesProps {
   isOpen: boolean
@@ -20,7 +21,7 @@ const MyCryptonotes: FC<MyCryptonotesProps> = ({ isOpen, onClose }) => {
   const { chain } = useNetwork()
 
   const { data: priceData } = useContractRead({
-    address: '0xD4a33860578De61DBAbDc8BFdb98FD742fA7028e',
+    address: contracts[`${chain?.id as number}`].oracle,
     abi: aggregatorV3InterfaceABI,
     functionName: 'latestRoundData',
   })

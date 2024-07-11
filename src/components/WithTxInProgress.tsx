@@ -1,23 +1,18 @@
 import { FC } from 'react'
 import { Box, Text, Link, Code } from '@chakra-ui/react'
 import { ExternalLinkIcon } from '@chakra-ui/icons'
-import { chain, etherscanBlockExplorers } from 'wagmi'
+import { Chain } from 'wagmi'
 import { shortenIfTransactionHash } from '../utils/helper'
 
 interface Props {
   txHash?: string
-  chainId?: number
+  chain?: Chain
 }
 
-const WithTxInProgress: FC<Props> = ({ txHash, chainId }) => {
+const WithTxInProgress: FC<Props> = ({ txHash, chain }) => {
   const getExplorerTransactionLink = () => {
-    if (!chainId) return ''
 
-    if (chainId === chain.polygonMumbai.id) {
-      return `${etherscanBlockExplorers.polygonMumbai.url}/tx/${txHash}`
-    } else {
-      return `${etherscanBlockExplorers.goerli.url}/tx/${txHash}`
-    }
+    return `${chain?.blockExplorers?.default.url}/tx/${txHash}`
   }
 
   return (
